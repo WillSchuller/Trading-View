@@ -1,0 +1,57 @@
+//@version=5
+indicator(title="Combined Strategy", overlay=true)
+
+// Volume Oscillator (VO)
+var cumVol = 0.
+cumVol += nz(volume)
+if barstate.islast and cumVol == 0
+    runtime.error("No volume is provided by the data vendor.")
+shortlenVO = 5
+longlenVO = 10
+shortVO = ta.ema(volume, shortlenVO)
+longVO = ta.ema(volume, longlenVO)
+oscVO = 100 * (shortVO - longVO) / longVO
+
+// Price Volume Trend (PVT)
+srcPVT = close
+pvt = cum(change(srcPVT) * volume)
+lengthPVT = 21
+signalTypePVT = "SMA"
+signalLengthPVT = 9
+signalPVT = signalTypePVT == "EMA" ? ta.ema(pvt, signalLengthPVT) : ta.sma(pvt, signalLengthPVT)
+buySignalPVT = crossover(pvt, signalPVT)
+sellSignalPVT = crossunder(pvt, signalPVT)
+
+// Stochastic
+periodK = 14
+smoothK = 1
+periodD = 3
+k = ta.sma(ta.stoch(close, high, low, periodK), smoothK)
+d = ta.sma(k, periodD)
+buySignalStoch = crossover(k, d) and k < 20
+sellSignalStoch = crossunder(k, d) and k > 80
+
+// RSI
+lengthRSI = 14
+overSoldRSI = 30
+overBoughtRSI = 70
+vrsi = ta.rsi(close, lengthRSI)
+buySignalRSI = crossover(vrsi, overSoldRSI)
+sellSignalRSI = crossunder(vrsi, overBoughtRSI)
+
+// MACD
+fastLengthMACD = 12
+slowLengthMACD = 26
+signalLengthMACD = 9
+macd = ta.ema(close, fastLengthMACD) - ta.ema(close, slowLengthMACD)
+signalMACD = ta.ema(macd, signalLengthMACD)
+buySignalMACD = ta.crossover(macd, signalMACD)
+sellSignalMACD = ta.crossunder(macd, signalMACD)
+
+// Combine conditions
+buyCondition = buySignalPVT and buySignalStoch and buySignalRSI and buySignalMACD
+sellCondition = sellSignalPVT or sellSignalStoch or sellSignalRSI or sellSignalMACD
+
+// Plot signals
+plotshape(series=buyCondition, title="Buy Signal", location=location.belowbar, color=color.green, style=shape.triangleup, size=size.small)
+plotshape(series=sellCondition, title="Sell Signal", location=location.abovebar, color=color.red, style=shape.triangledown, size=size.small)
