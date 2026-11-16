@@ -1,5 +1,5 @@
 //@version=5
-strategy("Combined Strategy (Backtestable, No Back-to-Back Signals + Red Bar Exit Bonus)", overlay=true, default_qty_type=strategy.percent_of_equity, default_qty_value=100, pyramiding=0)
+strategy("Combined Strategy (Red Volume Bar Bonus)", overlay=true, default_qty_type=strategy.percent_of_equity, default_qty_value=100, pyramiding=0)
 
 // ────── User Inputs ────── //
 lengthPVT         = input.int(21, "PVT Length")
@@ -51,15 +51,16 @@ longVO  = ta.ema(volume, 10)
 oscVO   = 100 * (shortVO - longVO) / longVO
 volFilter = not useVolumeOsc or oscVO > 0
 
-// ────── State and Red Bar Tracking ────── //
+// ────── State Tracking ────── //
 var bool inLong = false
 var bool inShort = false
-var int redBarsAfterBuy = 0
+var int redVolBarCount = 0
 
+// Track red volume bars after a buy
 if strategy.position_size > 0
-    redBarsAfterBuy := (close < open) ? redBarsAfterBuy + 1 : 0
+    redVolBarCount += (volume < volume[1]) ? 1 : 0
 else
-    redBarsAfterBuy := 0
+    redVolBarCount := 0  // Reset on exit
 
 // ────── Combined Logic ────── //
 buyScore =
@@ -73,12 +74,12 @@ sellScore =
      (sellSignalStoch  ? 1 : 0) +
      (sellSignalRSI    ? 1 : 0) +
      (sellSignalMACD   ? 2 : 0) +
-     ((redBarsAfterBuy == 2) ? 2 : 0) 
+     ((redVolBarCount >= 2) ? 1 : 0) 
 
 buyFinal  = (buyScore >= 2) and volFilter
 sellFinal = (sellScore >= 2) and volFilter
 
-// ────── Signal Control Logic ────── //
+// ────── Signal Control ────── //
 newBuySignal  = buyFinal and not inLong and strategy.position_size == 0
 newSellSignal = sellFinal and not inShort and strategy.position_size > 0
 
