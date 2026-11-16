@@ -1,4 +1,4 @@
-/@version=5
+//@version=5
 strategy("Combined Strategy (Backtestable)", overlay=true, default_qty_type=strategy.percent_of_equity, default_qty_value=100, pyramiding=0)
 
 // ────── User Inputs ────── //
@@ -63,7 +63,7 @@ sellScore =
      (sellSignalPVT    ? 1 : 0) +
      (sellSignalStoch  ? 1 : 0) +
      (sellSignalRSI    ? 1 : 0) +
-     (sellSignalMACD   ? 1 : 0)
+     (sellSignalMACD   ? 2 : 0)
 
 buyFinal  = (buyScore >= 2) and volFilter
 sellFinal = (sellScore >= 2) and volFilter
@@ -75,10 +75,10 @@ if buyFinal and strategy.position_size == 0
 if sellFinal and strategy.position_size > 0
     strategy.close("Long")
 
-
+// ────── Optional Plotting (For Visual Debugging) ────── //
 plotshape(buyFinal,  title="Buy Signal",  location=location.belowbar, color=color.green,  style=shape.triangleup,   size=size.small)
 plotshape(sellFinal, title="Sell Signal", location=location.abovebar, color=color.red,    style=shape.triangledown, size=size.small)
 
-
+// ────── Alerts (Optional) ────── //
 alertcondition(buyFinal,  title="Buy Alert",  message="Combined Strategy: Buy Signal")
 alertcondition(sellFinal, title="Sell Alert", message="Combined Strategy: Sell Signal")
