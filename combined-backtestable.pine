@@ -21,7 +21,6 @@ signalLengthMACD  = input.int(9,  "MACD Signal Length")
 useVolumeOsc      = input.bool(false, "Require Volume Oscillator > 0")
 
 // ────── Indicator Calculations ────── //
-
 // Price Volume Trend (PVT)
 srcPVT = close
 pvt = ta.cum(ta.change(srcPVT) * volume)
@@ -68,34 +67,29 @@ sellScore =
 buyFinal  = (buyScore >= 2) and volFilter
 sellFinal = (sellScore >= 2) and volFilter
 
-// ────── No Back-to-Back Signals ────── //
+// ────── Signal Control Logic ────── //
 var bool inLong = false
 var bool inShort = false
 
-// Reset tracking state
-if sellFinal
-    inShort := true
-    inLong := false
-
-if buyFinal
-    inLong := true
-    inShort := false
-
-// Only allow new signals if the previous signal was the opposite
+// Allow only alternating signals
 newBuySignal  = buyFinal and not inLong and strategy.position_size == 0
 newSellSignal = sellFinal and not inShort and strategy.position_size > 0
 
-// ────── Entry/Exit Execution ────── //
+// Entry/Exit and state updates
 if newBuySignal
     strategy.entry("Long", strategy.long)
+    inLong := true
+    inShort := false
 
 if newSellSignal
     strategy.close("Long")
+    inShort := true
+    inLong := false
 
-// ────── Plotting (Visual Confirmation) ────── //
+// ────── Plotting ────── //
 plotshape(newBuySignal,  title="Buy Signal",  location=location.belowbar, color=color.green,  style=shape.triangleup,   size=size.small)
 plotshape(newSellSignal, title="Sell Signal", location=location.abovebar, color=color.red,    style=shape.triangledown, size=size.small)
 
-// ────── Alerts (Optional) ────── //
+// ────── Alerts ────── //
 alertcondition(newBuySignal,  title="Buy Alert",  message="Combined Strategy: New Buy Signal")
 alertcondition(newSellSignal, title="Sell Alert", message="Combined Strategy: New Sell Signal")
