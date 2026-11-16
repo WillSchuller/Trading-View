@@ -1,0 +1,84 @@
+/@version=5
+strategy("Combined Strategy (Backtestable)", overlay=true, default_qty_type=strategy.percent_of_equity, default_qty_value=100, pyramiding=0)
+
+// ────── User Inputs ────── //
+lengthPVT         = input.int(21, "PVT Length")
+signalLengthPVT   = input.int(9, "PVT Signal Length")
+signalTypePVT     = input.string("SMA", "PVT Signal Type", options=["SMA", "EMA"])
+
+periodK           = input.int(14, "Stochastic %K Length")
+periodD           = input.int(3, "Stochastic %D Length")
+smoothK           = input.int(1, "Stochastic Smoothing")
+
+lengthRSI         = input.int(14, "RSI Length")
+overSoldRSI       = input.int(30, "RSI Oversold")
+overBoughtRSI     = input.int(70, "RSI Overbought")
+
+fastLengthMACD    = input.int(24, "MACD Fast Length")
+slowLengthMACD    = input.int(50, "MACD Slow Length")
+signalLengthMACD  = input.int(9,  "MACD Signal Length")
+
+useVolumeOsc      = input.bool(false, "Require Volume Oscillator > 0")
+
+// ────── Indicators ────── //
+
+// Price Volume Trend (PVT)
+srcPVT = close
+pvt = ta.cum(ta.change(srcPVT) * volume)
+signalPVT = signalTypePVT == "EMA" ? ta.ema(pvt, signalLengthPVT) : ta.sma(pvt, signalLengthPVT)
+buySignalPVT  = ta.crossover(pvt, signalPVT)
+sellSignalPVT = ta.crossunder(pvt, signalPVT)
+
+// Stochastic
+k = ta.sma(ta.stoch(close, high, low, periodK), smoothK)
+d = ta.sma(k, periodD)
+buySignalStoch  = ta.crossover(k, d) and k < 20
+sellSignalStoch = ta.crossunder(k, d) and k > 80
+
+// RSI
+vrsi = ta.rsi(close, lengthRSI)
+buySignalRSI  = ta.crossover(vrsi, overSoldRSI)
+sellSignalRSI = ta.crossunder(vrsi, overBoughtRSI)
+
+// MACD
+macd       = ta.ema(close, fastLengthMACD) - ta.ema(close, slowLengthMACD)
+signalMACD = ta.ema(macd, signalLengthMACD)
+buySignalMACD  = ta.crossover(macd, signalMACD)
+sellSignalMACD = ta.crossunder(macd, signalMACD)
+
+// Volume Oscillator (optional filter)
+shortVO   = ta.ema(volume, 5)
+longVO    = ta.ema(volume, 10)
+oscVO     = 100 * (shortVO - longVO) / longVO
+volFilter = not useVolumeOsc or oscVO > 0
+
+// ────── Combined Logic ────── //
+buyScore =
+     (buySignalPVT     ? 1 : 0) +
+     (buySignalStoch   ? 1 : 0) +
+     (buySignalRSI     ? 1 : 0) +
+     (buySignalMACD    ? 2 : 0)
+
+sellScore =
+     (sellSignalPVT    ? 1 : 0) +
+     (sellSignalStoch  ? 1 : 0) +
+     (sellSignalRSI    ? 1 : 0) +
+     (sellSignalMACD   ? 1 : 0)
+
+buyFinal  = (buyScore >= 2) and volFilter
+sellFinal = (sellScore >= 2) and volFilter
+
+// ────── Entry/Exit Logic ────── //
+if buyFinal and strategy.position_size == 0
+    strategy.entry("Long", strategy.long)
+
+if sellFinal and strategy.position_size > 0
+    strategy.close("Long")
+
+
+plotshape(buyFinal,  title="Buy Signal",  location=location.belowbar, color=color.green,  style=shape.triangleup,   size=size.small)
+plotshape(sellFinal, title="Sell Signal", location=location.abovebar, color=color.red,    style=shape.triangledown, size=size.small)
+
+
+alertcondition(buyFinal,  title="Buy Alert",  message="Combined Strategy: Buy Signal")
+alertcondition(sellFinal, title="Sell Alert", message="Combined Strategy: Sell Signal")
