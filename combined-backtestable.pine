@@ -74,7 +74,7 @@ sellScore =
      (sellSignalStoch  ? 1 : 0) +
      (sellSignalRSI    ? 1 : 0) +
      (sellSignalMACD   ? 2 : 0) +
-     ((redVolBarCount >= 2) ? 1 : 0) 
+     ((redVolBarCount >= 2) ? 2 : 0)  // ✅ Bonus for 2+ red volume bars after entry
 
 buyFinal  = (buyScore >= 2) and volFilter
 sellFinal = (sellScore >= 2) and volFilter
