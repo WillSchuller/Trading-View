@@ -1,5 +1,5 @@
 //@version=5
-strategy("Combined Strategy (Backtestable)", overlay=true, default_qty_type=strategy.percent_of_equity, default_qty_value=100, pyramiding=0)
+strategy("Combined Strategy (Backtestable, No Back-to-Back Signals)", overlay=true, default_qty_type=strategy.percent_of_equity, default_qty_value=100, pyramiding=0)
 
 // ────── User Inputs ────── //
 lengthPVT         = input.int(21, "PVT Length")
@@ -20,7 +20,7 @@ signalLengthMACD  = input.int(9,  "MACD Signal Length")
 
 useVolumeOsc      = input.bool(false, "Require Volume Oscillator > 0")
 
-// ────── Indicators ────── //
+// ────── Indicator Calculations ────── //
 
 // Price Volume Trend (PVT)
 srcPVT = close
@@ -41,15 +41,15 @@ buySignalRSI  = ta.crossover(vrsi, overSoldRSI)
 sellSignalRSI = ta.crossunder(vrsi, overBoughtRSI)
 
 // MACD
-macd       = ta.ema(close, fastLengthMACD) - ta.ema(close, slowLengthMACD)
-signalMACD = ta.ema(macd, signalLengthMACD)
+macd        = ta.ema(close, fastLengthMACD) - ta.ema(close, slowLengthMACD)
+signalMACD  = ta.ema(macd, signalLengthMACD)
 buySignalMACD  = ta.crossover(macd, signalMACD)
 sellSignalMACD = ta.crossunder(macd, signalMACD)
 
 // Volume Oscillator (optional filter)
-shortVO   = ta.ema(volume, 5)
-longVO    = ta.ema(volume, 10)
-oscVO     = 100 * (shortVO - longVO) / longVO
+shortVO = ta.ema(volume, 5)
+longVO  = ta.ema(volume, 10)
+oscVO   = 100 * (shortVO - longVO) / longVO
 volFilter = not useVolumeOsc or oscVO > 0
 
 // ────── Combined Logic ────── //
@@ -68,17 +68,34 @@ sellScore =
 buyFinal  = (buyScore >= 2) and volFilter
 sellFinal = (sellScore >= 2) and volFilter
 
-// ────── Entry/Exit Logic ────── //
-if buyFinal and strategy.position_size == 0
+// ────── No Back-to-Back Signals ────── //
+var bool inLong = false
+var bool inShort = false
+
+// Reset tracking state
+if sellFinal
+    inShort := true
+    inLong := false
+
+if buyFinal
+    inLong := true
+    inShort := false
+
+// Only allow new signals if the previous signal was the opposite
+newBuySignal  = buyFinal and not inLong and strategy.position_size == 0
+newSellSignal = sellFinal and not inShort and strategy.position_size > 0
+
+// ────── Entry/Exit Execution ────── //
+if newBuySignal
     strategy.entry("Long", strategy.long)
 
-if sellFinal and strategy.position_size > 0
+if newSellSignal
     strategy.close("Long")
 
-// ────── Optional Plotting (For Visual Debugging) ────── //
-plotshape(buyFinal,  title="Buy Signal",  location=location.belowbar, color=color.green,  style=shape.triangleup,   size=size.small)
-plotshape(sellFinal, title="Sell Signal", location=location.abovebar, color=color.red,    style=shape.triangledown, size=size.small)
+// ────── Plotting (Visual Confirmation) ────── //
+plotshape(newBuySignal,  title="Buy Signal",  location=location.belowbar, color=color.green,  style=shape.triangleup,   size=size.small)
+plotshape(newSellSignal, title="Sell Signal", location=location.abovebar, color=color.red,    style=shape.triangledown, size=size.small)
 
 // ────── Alerts (Optional) ────── //
-alertcondition(buyFinal,  title="Buy Alert",  message="Combined Strategy: Buy Signal")
-alertcondition(sellFinal, title="Sell Alert", message="Combined Strategy: Sell Signal")
+alertcondition(newBuySignal,  title="Buy Alert",  message="Combined Strategy: New Buy Signal")
+alertcondition(newSellSignal, title="Sell Alert", message="Combined Strategy: New Sell Signal")
